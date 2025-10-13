@@ -18,8 +18,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
+import { allowOnlyLetters, allowOnlyNumbers, allowValidEmail, isValidEmail, isValidPassword, isValidPhoneNumber, removeSpaces } from "../../utils/validators";
 import { auth, db } from "../services/firebase"; // Adjust the import path as needed
 
 const RegistrationScreen = () => {
@@ -29,10 +31,23 @@ const RegistrationScreen = () => {
   const [mobileNumber, setMobileNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("")
   const [companyCode, setCompanyCode] = useState("ALP");
-  const[loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { logout } = useAuth();
   const router = useRouter();
+
+
+  const handleBlurPassword = (text) => {
+    console.log("text", text)
+    console.log(isValidPassword(text))
+    if (!isValidPassword(text)) {
+      setPasswordError('Password must be at least 4 characters and include a number');
+    } else {
+      setPasswordError('');
+    }
+  };
 
   const handleRegister = async () => {
     if (
@@ -45,6 +60,23 @@ const RegistrationScreen = () => {
     ) {
       Alert.alert("Error", "Please fill in all fields.");
       return;
+    }
+
+    if (!isValidEmail(email)) {
+      Alert.alert("Error", "Please Enter a valid email");
+      return;
+
+    }
+
+    if(!isValidPassword(password)){
+      Alert.alert("Error", "Please Enter a valid password");
+      return;
+    }
+
+    if (!isValidPhoneNumber(mobileNumber)) {
+      Alert.alert("Error", "Please Enter a valid mobile number");
+      return;
+
     }
 
     try {
@@ -94,21 +126,23 @@ const RegistrationScreen = () => {
     >
       <ScrollView
         contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.title}>Register</Text>
         <TextInput
           style={styles.input}
           placeholder="First Name"
           value={firstName}
-          onChangeText={setFirstName}
+          onChangeText={(text) => setFirstName(allowOnlyLetters(text))}
+          onBlur={()=>setFirstName(firstName.trim())}
           placeholderTextColor="#888"
         />
         <TextInput
           style={styles.input}
           placeholder="Last Name"
           value={lastName}
-          onChangeText={setLastName}
+          onChangeText={(text) => setLastName(allowOnlyLetters(text))}
+          onBlur={()=>setLastName(lastName.trim())}
           placeholderTextColor="#888"
         />
         <TextInput
@@ -121,8 +155,9 @@ const RegistrationScreen = () => {
         <TextInput
           style={styles.input}
           placeholder="Mobile Number"
+          maxLength={10}
           value={mobileNumber}
-          onChangeText={setMobileNumber}
+          onChangeText={(text) => setMobileNumber(allowOnlyNumbers(text))}
           keyboardType="phone-pad"
           placeholderTextColor="#888"
         />
@@ -130,20 +165,12 @@ const RegistrationScreen = () => {
           style={styles.input}
           placeholder="Email ID"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(text) => setEmail(allowValidEmail(text))}
           keyboardType="email-address"
           autoCapitalize="none"
           placeholderTextColor="#888"
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholderTextColor="#888"
-        />
-        <View style={styles.pickerContainer}>
+                <View style={styles.pickerContainer}>
           <Picker
             selectedValue={companyCode}
             style={styles.picker}
@@ -154,9 +181,35 @@ const RegistrationScreen = () => {
             <Picker.Item label="IV" value="IV" />
           </Picker>
         </View>
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={[styles.input, { width: "100%" }]}
+            placeholder="Password"
+            value={password}
+            onChangeText={(text) => {
+              setPassword(removeSpaces(text))
+              setPasswordError("")
+            }}
+            onBlur={() => handleBlurPassword(password)}
+            secureTextEntry={!showPassword}
+            placeholderTextColor="#888"
+          />
+          <TouchableOpacity
+            onPress={() => setShowPassword(!showPassword)}
+            style={styles.iconContainer}
+          >
+            <Icon
+              name={showPassword ? 'eye-off' : 'eye'}
+              size={24}
+              color="#888"
+            />
+          </TouchableOpacity>
+        </View>
+        {passwordError?<Text style={styles.passwordError}>{passwordError}</Text>:""}
+
         <View style={styles.buttonContainer}>
           <Button
-            title={loading? "Registering...":"Register"}
+            title={loading ? "Registering..." : "Register"}
             onPress={handleRegister}
             color={Colors.light.tint}
             disabled={loading}
@@ -175,13 +228,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f5f5",
   },
+  passwordError:{
+    color: "red",
+    width: "90%",
+    marginBottom: 10,
+    textAlign: "left !important",
+  },
   container: {
-  padding: 20,
-   flexGrow: 1,
-  paddingBottom: 10, 
-  alignItems: "center",
-  backgroundColor: "#f5f5f5",
-},
+    padding: 20,
+    flexGrow: 1,
+    paddingBottom: 10,
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: "relative",
+    width: "94%",
+    // borderWidth: 1,
+    // borderColor: '#ccc',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+  },
+
   logo: {
     width: 120,
     height: 120,
@@ -191,7 +261,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "bold",
     marginBottom: 25,
-    marginTop:60,
+    marginTop: 60,
     color: "#333",
   },
   input: {
@@ -225,6 +295,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 1.41,
     elevation: 2,
+  },
+  iconContainer: {
+    position: 'absolute',
+    right: 10,   // position inside the input box, on the right
+    top: "30%",
+    transform: [{ translateY: -12 }], // center vertically (icon size 24, so 12 half)
+    padding: 4,
   },
   picker: {
     width: "100%",

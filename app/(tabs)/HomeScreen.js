@@ -21,6 +21,7 @@ import LoadingScreen from "../../components/LoadingScreen";
 import { Colors } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../services/firebase";
+import { formatTimeTo12Hour, getCurrentISTTime, getISTDateString } from "../../utils/utils";
 
 // --- Development Flag ---
 const IS_DEVELOPMENT_MODE = false;
@@ -64,6 +65,8 @@ const HomeScreen = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [BookMealLoading, setBookMealLoading] = useState(false);
+  const [bookedAlready, setBookedAlready] = useState(false)
+  const [bookingMessage, setBookingMessage] = useState("")
   const router = useRouter();
 
   useEffect(() => {
@@ -77,6 +80,35 @@ const HomeScreen = () => {
     if (!uid) return false; // Not logged in
     const adminDoc = await getDoc(doc(db, "admins", uid));
     return adminDoc.exists(); // true if admin, else false
+  }
+
+
+
+  const checkIfMealBookedAlready = async (userData) => {
+    const today = new Date();
+    const todayDateString = today.toISOString().split("T")[0];
+
+    const bookingsRef = collection(db, "mealBookings");
+    const q = query(
+      bookingsRef,
+      where("employeeCode", "==", userData.employeeCode),
+      where("mealDate", "==", todayDateString)
+    );
+    try {
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        const docData = querySnapshot.docs[0].data();
+        const { mealDate, mealTime } = docData;
+
+        const formattedTime = formatTimeTo12Hour(mealTime); // e.g. "6:57 AM"
+
+        const message = `Your meal was booked on ${mealDate} at ${formattedTime}`;
+        setBookedAlready(true);
+        setBookingMessage(message);
+      }
+    } catch (error) {
+      console.log("Unable to get details", error)
+    }
   }
 
   useEffect(() => {
@@ -94,6 +126,7 @@ const HomeScreen = () => {
           if (!querySnapshot.empty) {
             const doc = querySnapshot.docs[0];
             setUserData(doc.data());
+            checkIfMealBookedAlready(doc.data())
           } else {
             console.log("No such document!");
           }
@@ -133,7 +166,7 @@ const HomeScreen = () => {
     }
 
     const today = new Date();
-    const todayDateString = today.toISOString().split("T")[0];
+    const todayDateString = getISTDateString();
 
     const bookingsRef = collection(db, "mealBookings");
     const q = query(
@@ -157,14 +190,16 @@ const HomeScreen = () => {
           firstName: userData.firstName,
           lastName: userData.lastName,
           mealDate: todayDateString,
-          mealTime: today.toTimeString().split(" ")[0],
+          mealTime: getCurrentISTTime(),
         };
+        console.log(newBooking, "new booking")
+        console.log("bookingsRef",bookingsRef)
         await addDoc(bookingsRef, newBooking);
         Alert.alert("Success", "Your meal has been booked successfully.");
       }
     } catch (error) {
       console.error("Error booking meal:", error);
-      Alert.alert("Error", "There was an error booking your meal.");
+      Alert.alert("Sorry!", "We’re unable to book your meal at the moment. Please try again later.");
     } finally {
       setBookMealLoading(false); // ✅ Always stop loading
     }
@@ -190,6 +225,8 @@ const HomeScreen = () => {
               <Text style={styles.bookingTiming}>
                 Booking Timing: 12:00 AM - 7:30 AM
               </Text>
+
+              {bookedAlready ? <Text style={styles.bookedAlready}>{bookingMessage}</Text> : ""}
             </View>
           ) : (
             <Text>Loading user data...</Text>
@@ -260,6 +297,12 @@ const styles = StyleSheet.create({
     color: Colors.light.tint,
     fontWeight: "bold",
     fontSize: 14,
+  },
+  bookedAlready: {
+    color: "green",
+    fontSize: 16,
+    fontWeight: "bold",
+    marginTop: 10,
   },
   content: {
     flex: 1,

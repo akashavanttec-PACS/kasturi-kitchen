@@ -229,7 +229,7 @@ export const AuthProvider = ({ children }) => {
   // 🔁 Firebase auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log(auth.currentUser, "auth.currentUser")
+      console.log(auth, "auth.currentUser")
       if (firebaseUser) {
         const verified = firebaseUser.emailVerified;
 
@@ -245,7 +245,7 @@ export const AuthProvider = ({ children }) => {
         }));
 
         await save(STORAGE_KEYS.LOGGED_IN, JSON.stringify(verified));
-      } 
+      }
       setIsLoaded(true);
     });
 
@@ -253,7 +253,7 @@ export const AuthProvider = ({ children }) => {
   }, [auth.currentUser]);
 
   // 🔓 Logout
-  const logout = async() => {
+  const logout = async () => {
     console.log("🚪 Logging out...");
     setUser(null);
     setIsUserLoggedInState(false);

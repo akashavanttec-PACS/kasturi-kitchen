@@ -1,31 +1,29 @@
 import { useRouter } from "expo-router";
 import {
-  sendEmailVerification,
-  signInWithEmailAndPassword,
+  signInWithEmailAndPassword
 } from "firebase/auth";
-import { useAuth } from "../../context/AuthContext";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Button,
   Image,
   KeyboardAvoidingView,
-  ActivityIndicator,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
-import { Colors } from "../../constants/theme";
-import { auth } from "../services/firebase";
 import LoadingScreen from "../../components/LoadingScreen";
-import { isLoading } from "expo-font";
+import { Colors } from "../../constants/theme";
+import { useAuth } from "../../context/AuthContext";
+import { auth } from "../services/firebase";
 
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -42,6 +40,17 @@ const LoginScreen = () => {
     return <LoadingScreen />; // fallback in case layout didn't catch it
   }
 
+  // ✅ Email validation function
+  const validateEmail = (text) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!text) {
+      setEmailError("Email is required.");
+    } else if (!emailRegex.test(text)) {
+      setEmailError("Please enter a valid email address.");
+    } else {
+      setEmailError("");
+    }
+  }
   const handleLogin = async () => {
     if (!email || !password) {
       setError("Please enter both email and password.");
@@ -56,7 +65,6 @@ const LoginScreen = () => {
         password
       );
       const user = userCredential.user;
-      console.log(user.email, "email", user.emailVerified);
       if (user.emailVerified) {
         // The root layout will handle the redirect to home automatically
       } else {
@@ -64,20 +72,21 @@ const LoginScreen = () => {
           "Email Not Verified",
           "Please verify your email address to log in. Check your inbox for the verification link.",
           [
-            {
-              text: "Resend Email",
-              onPress: async () => {
-                try {
-                  await sendEmailVerification(user);
-                  Alert.alert(
-                    "Email Sent",
-                    "A new verification email has been sent to your address."
-                  );
-                } catch (resendError) {
-                  setError(resendError.message);
-                }
-              },
-            },
+            //TO-DO:need to work on this later
+            // {
+            //   text: "Resend Email",
+            //   onPress: async () => {
+            //     try {
+            //       await sendEmailVerification(user);
+            //       Alert.alert(
+            //         "Email Sent",
+            //         "A new verification email has been sent to your address."
+            //       );
+            //     } catch (resendError) {
+            //       setError(resendError.message);
+            //     }
+            //   },
+            // },
             { text: "OK", style: "cancel" },
           ]
         );
@@ -112,31 +121,42 @@ const LoginScreen = () => {
           style={styles.logo}
         />
         <Text style={styles.title}>Login</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholderTextColor="#888"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholderTextColor="#888"
-        />
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChangeText={(text) => {
+              const filteredText = text.replace(/[^a-zA-Z0-9@._-]/g, "");
+              setEmail(filteredText);
+              setError(""); // clear global error when editing
+              setEmailError("");
+            }}
+            onBlur={() => validateEmail(email)}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            placeholderTextColor="#888"
+          />
+          {emailError ? <Text style={styles.emailError}>{emailError}</Text> : null}
+        </View>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholderTextColor="#888"
+          />
+        </View>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.buttonContainer}>
-            <Button
-              title={loading ? "Logging in..." : "Login"}
-              onPress={handleLogin}
-              color={Colors.light.tint}
-              disabled={loading}
-            />
+          <Button
+            title={loading ? "Logging in..." : "Login"}
+            onPress={handleLogin}
+            color={Colors.light.tint}
+            disabled={loading}
+          />
         </View>
         <TouchableOpacity
           onPress={() => router.push("/(auth)/RegistrationScreen")}
@@ -164,6 +184,7 @@ const styles = StyleSheet.create({
     height: 120,
     marginBottom: 30,
   },
+  inputContainer: { width: "100%", alignItems: "center", marginBottom: 10 },
   title: {
     fontSize: 28,
     fontWeight: "bold",
@@ -175,7 +196,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderRadius: 8,
-    marginBottom: 20,
+    marginBottom: 10,
     fontSize: 16,
     color: "#333",
     backgroundColor: "#fff",
@@ -192,6 +213,12 @@ const styles = StyleSheet.create({
     color: "red",
     marginBottom: 16,
     textAlign: "center",
+  },
+  emailError: {
+    color: "red",
+    width: "90%",
+    marginBottom: 5,
+    textAlign: "left !important",
   },
   buttonContainer: {
     width: "90%",
