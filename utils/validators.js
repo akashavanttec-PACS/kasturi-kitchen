@@ -45,4 +45,4 @@ export const allowValidEmail = (text) => {
     return text.replace(/[^a-zA-Z0-9@._-]/g, "");
 };
 
-export const isValidPassword = (password) => /^(?=.*\d).{4,}$/.test(password);
+export const isValidPassword = (password) => /^[A-Za-z0-9]{6,}$/.test(password);

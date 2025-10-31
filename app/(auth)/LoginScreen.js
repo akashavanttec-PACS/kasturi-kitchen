@@ -20,11 +20,14 @@ import LoadingScreen from "../../components/LoadingScreen";
 import { Colors } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 import { auth } from "../services/firebase";
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import {firebaseErrorMessages} from "../../constants/errorMessages"
 
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [password, setPassword] = useState("");
+   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -96,7 +99,9 @@ const LoginScreen = () => {
       }
       setLoading(false)
     } catch (err) {
-      setError(err.message);
+      const rawCode = err.code || err.message || "unknown";
+      const friendlyMessage = firebaseErrorMessages[rawCode] || "Something went wrong. Please try again.";
+      setError(friendlyMessage);
       setLoading(false)
 
     }
@@ -124,7 +129,7 @@ const LoginScreen = () => {
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder="Email*"
             value={email}
             onChangeText={(text) => {
               const filteredText = text.replace(/[^a-zA-Z0-9@._-]/g, "");
@@ -142,12 +147,22 @@ const LoginScreen = () => {
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
-            placeholder="Password"
+            placeholder="Password*"
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
+            secureTextEntry={!showPassword}
             placeholderTextColor="#888"
           />
+           <TouchableOpacity
+            onPress={() => setShowPassword(!showPassword)}
+            style={styles.iconContainer}
+          >
+            <Icon
+              name={showPassword ? 'eye' : 'eye-off'}
+              size={24}
+              color="#888"
+            />
+          </TouchableOpacity>
         </View>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.buttonContainer}>
@@ -208,6 +223,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 1.41,
     elevation: 2,
+  },
+    iconContainer: {
+    position: 'absolute',
+    right: "8%",   // position inside the input box, on the right
+    top: "35%",
+    transform: [{ translateY: -12 }], // center vertically (icon size 24, so 12 half)
+    padding: 4,
   },
   error: {
     color: "red",

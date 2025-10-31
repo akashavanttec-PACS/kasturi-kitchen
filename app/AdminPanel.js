@@ -1,16 +1,30 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView, TouchableOpacity, Platform, Button } from 'react-native';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { Picker } from '@react-native-picker/picker';
 import { db } from './services/firebase';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import { Colors } from '../constants/theme';
 import { exportBookingsAsCSV } from '../utils/exportToCSV';
 import MealTable from '../components/MealTable';
 
+
 const AdminPanel = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMonthly, setLoadingMonthly] = useState(false); // New state for monthly loading
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const currentYear = new Date().getFullYear();
+
+  // Fixed starting year = 2025 (launch year)
+  const launchYear = 2025;
+
+  // Dynamically create the list of years from 2025 → current year
+  const years = Array.from({ length: currentYear - launchYear + 1 }, (_, i) => launchYear + i);
 
   const groupByCompany = (bookingsArray) => {
     const grouped = {};
@@ -22,6 +36,12 @@ const AdminPanel = () => {
     return grouped;
   };
 
+
+const [selectedDate, setSelectedDate] = useState(new Date());
+const currentDate = new Date();
+const currentMonth = currentDate.getMonth();
+
+	
 
   useEffect(() => {
     const fetchBookings = async () => {
@@ -54,6 +74,51 @@ const AdminPanel = () => {
     fetchBookings();
   }, []);
 
+  //Monthly bookings
+ const fetchMonthlyBookings = async () => {
+    try {
+      setLoadingMonthly(true);
+
+      const year = selectedYear;
+      const firstDay = new Date(year, selectedMonth, 1);
+      const lastDay = new Date(year, selectedMonth + 1, 0, 23, 59, 59);
+      console.log('Fetching bookings from', firstDay, 'to', lastDay);
+      const startTimestamp = Timestamp.fromDate(firstDay);
+      const endTimestamp = Timestamp.fromDate(lastDay);
+      console.log('Start Timestamp:', startTimestamp);
+      console.log('End Timestamp:', endTimestamp);
+      const bookingsRef = collection(db, 'mealBookings');
+      const q = query(
+        bookingsRef,
+        where('orderDate', '>=', startTimestamp),
+        where('orderDate', '<=', endTimestamp)
+      );
+
+      const querySnapshot = await getDocs(q);
+      const bookingsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      if (bookingsData.length === 0) {
+        Alert.alert('No Data', `No bookings found for ${months[selectedMonth]}.`);
+        return;
+      }
+
+      const grouped = groupByCompany(bookingsData);
+      const sectionedBookings = Object.keys(grouped).map((companyCode) => ({
+        title: companyCode,
+        data: grouped[companyCode],
+      }));
+
+      await exportBookingsAsCSV(sectionedBookings, 'monthly');
+      Alert.alert('Success', `${months[selectedMonth]} report generated successfully!`);
+    } catch (error) {
+      console.error('Error fetching monthly bookings:', error);
+      Alert.alert('Error', 'Could not fetch monthly bookings.');
+    } finally {
+      setLoadingMonthly(false);
+    }
+  };
+
+
   if (loading) {
     return <ActivityIndicator size="large" color={Colors.light.tint} style={styles.loader} />;
   }
@@ -84,8 +149,52 @@ const AdminPanel = () => {
               style={styles.exportButton}
               onPress={() => exportBookingsAsCSV(bookings)}
             >
-              <Text style={styles.exportButtonText}>Export as CSV</Text>
+              <Text style={styles.exportButtonText}>Daily Report</Text>
             </TouchableOpacity>
+
+              {/* 🔹 Monthly Report Button */}
+            <View style={styles.monthSelectorContainer}>
+              <View style={styles.pickerWrapper}>
+              <Picker
+                selectedValue={selectedMonth}
+                style={styles.monthPicker}
+                onValueChange={(itemValue) => setSelectedMonth(itemValue)}
+              >
+                {months.map((month, index) => (
+                  <Picker.Item key={month} label={month} value={index} />
+                ))}
+              </Picker>
+              </View>
+                <View style={styles.pickerWrapper}>
+                <Picker
+                  selectedValue={selectedYear}
+                  style={styles.monthPicker}
+                  onValueChange={(itemValue) => setSelectedYear(itemValue)}
+                >
+                  {years.map((year) => (
+                    <Picker.Item key={year} label={year.toString()} value={year} />
+                  ))}
+                </Picker>
+              </View>
+
+            </View>
+            <View>
+              <TouchableOpacity
+                style={[styles.exportButton,{ marginBottom: 20 }, loadingMonthly ? styles.disabledButton : null]}
+                onPress={fetchMonthlyBookings}
+                disabled={loadingMonthly}
+                activeOpacity={loadingMonthly ? 1 : 0.7}
+              >
+                 {/* {loadingMonthly && (
+                     <ActivityIndicator size="small" color="#fff" style={styles.spinner} />
+                 )} */}
+                <Text style={styles.exportButtonText}>
+                  {loadingMonthly ? 'Generating...' : 'Get Monthly Report'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+
 
             {/* Table for each Company */}
             {bookings.map((section) => (
@@ -163,7 +272,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 10,
     alignItems: 'center',
-    marginBottom: 25,
+    // marginBottom: 25,
     shadowColor: '#000',
     shadowOpacity: 0.15,
     shadowRadius: 3,
@@ -242,6 +351,32 @@ const styles = StyleSheet.create({
     marginTop: 50,
     color: '#888',
   },
+  monthSelectorContainer:{
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    justifyContent: 'space-between',
+    marginVertical: 15,
+  },
+  pickerWrapper: {
+  flex: 1,
+  borderWidth: 1,
+  borderColor: '#ccc',
+  borderRadius: 10,
+  backgroundColor: '#fff',
+  overflow: 'hidden', // helps border radius on Android
+},
+disabledButton: {
+  backgroundColor: '#A9A9A9',
+  opacity: 0.7,
+},
+
+monthPicker: {
+  width: '100%',
+  height: 50,
+  color: '#000',
+},
 });
 
 export default AdminPanel;

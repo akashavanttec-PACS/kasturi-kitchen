@@ -4,7 +4,7 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
 } from "firebase/auth";
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc } from "firebase/firestore";
 import { useState } from "react";
 import {
   Alert,
@@ -23,6 +23,49 @@ import { Colors } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 import { allowOnlyLetters, allowOnlyNumbers, allowValidEmail, isValidEmail, isValidPassword, isValidPhoneNumber, removeSpaces } from "../../utils/validators";
 import { auth, db } from "../services/firebase"; // Adjust the import path as needed
+import {firebaseErrorMessages} from "../../constants/errorMessages"
+
+
+import { query, where, getDocs,getDoc, collection, doc , setDoc} from "firebase/firestore";
+
+async function addEmployee(db, {
+  uid,
+  firstName,
+  lastName,
+  employeeCode,
+  mobileNumber,
+  email,
+  companyCode,
+}) {
+// const q = query(
+//   collection(db, "employees"),
+//   where("employeeCode", "==", employeeCode)
+// );
+
+// const snapshot = await getDocs(q);
+
+// if (!snapshot.empty) {
+//   throw new Error("employee-already-exists");
+// }
+
+
+     // 1. Create a reference to the document with employeeCode as ID
+    const sanitizedCode = employeeCode.replace(/\//g, "_");
+    const employeeRef = doc(db, "employees", sanitizedCode);
+
+  await setDoc(employeeRef, {
+    uid,
+    firstName,
+    lastName,
+    employeeCode,
+    mobileNumber,
+    email,
+    companyCode,
+  });
+
+  console.log("Employee added successfully.");
+ 
+}
 
 const RegistrationScreen = () => {
   const [firstName, setFirstName] = useState("");
@@ -30,9 +73,17 @@ const RegistrationScreen = () => {
   const [employeeCode, setEmployeeCode] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [email, setEmail] = useState("");
+
+  //Password
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("")
+  
+  //Confirm Password
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [confirmPasswordError, setConfirmPasswordError] = useState("")
+
   const [companyCode, setCompanyCode] = useState("ALP");
   const [loading, setLoading] = useState(false);
   const { logout } = useAuth();
@@ -40,14 +91,23 @@ const RegistrationScreen = () => {
 
 
   const handleBlurPassword = (text) => {
-    console.log("text", text)
     console.log(isValidPassword(text))
     if (!isValidPassword(text)) {
-      setPasswordError('Password must be at least 4 characters and include a number');
+      // setPasswordError('Password must be at least 4 characters and include a number');
+      setPasswordError('Password must be at least 6 characters long and contain only letters or numbers.');
     } else {
       setPasswordError('');
     }
   };
+
+  const handleBlurConfirmPassword = (password, confirmPassword) => {
+    const isPasswordSame = password === confirmPassword
+  if (!isPasswordSame) {
+    setConfirmPasswordError("Password and confirm password must be the same");
+  } else {
+    setConfirmPasswordError("");
+  }
+  }
 
   const handleRegister = async () => {
     if (
@@ -56,7 +116,8 @@ const RegistrationScreen = () => {
       !employeeCode ||
       !mobileNumber ||
       !email ||
-      !password
+      !password||
+      !confirmPassword
     ) {
       Alert.alert("Error", "Please fill in all fields.");
       return;
@@ -73,6 +134,12 @@ const RegistrationScreen = () => {
       return;
     }
 
+  const isPasswordSame = password === confirmPassword
+  if (!isPasswordSame) {
+    Alert.alert("Error","Password and confirm password must be the same");
+    return
+  } 
+
     if (!isValidPhoneNumber(mobileNumber)) {
       Alert.alert("Error", "Please Enter a valid mobile number");
       return;
@@ -81,6 +148,19 @@ const RegistrationScreen = () => {
 
     try {
       setLoading(true)
+      //check the employee code
+        // 1. Check if employeeCode is already taken
+  const sanitizedCode = employeeCode.replace(/\//g, "_");
+  const employeeRef = doc(db, "employees", sanitizedCode);
+  const existingEmployee = await getDoc(employeeRef);
+
+  if (existingEmployee.exists()) {
+    Alert.alert("Error", "Employee code is already taken. Please choose another.");
+    setLoading(false);
+    return;
+  }
+
+
       // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -96,8 +176,8 @@ const RegistrationScreen = () => {
         "Registration successful! Please check your email to verify your account."
       );
 
-      // Store employee details in Firestore
-      await addDoc(collection(db, "employees"), {
+
+     await addEmployee(db,{
         uid: user.uid,
         firstName,
         lastName,
@@ -105,15 +185,17 @@ const RegistrationScreen = () => {
         mobileNumber,
         email,
         companyCode,
-      });
+      })
 
       // Logout the user and navigate to login
       setLoading(false)
       await logout();
       router.replace("/(auth)/LoginScreen");
     } catch (error) {
-      console.error("Registration Error:", error);
-      Alert.alert("Registration Error", error.message);
+      console.log("Error", error)
+       const rawCode = error.code || error.message || "unknown";
+      const friendlyMessage = firebaseErrorMessages[rawCode] || "Something went wrong. Please try again.";
+      Alert.alert("Registration Error", friendlyMessage);
       setLoading(false)
     }
   };
@@ -131,7 +213,7 @@ const RegistrationScreen = () => {
         <Text style={styles.title}>Register</Text>
         <TextInput
           style={styles.input}
-          placeholder="First Name"
+          placeholder="First Name*"
           value={firstName}
           onChangeText={(text) => setFirstName(allowOnlyLetters(text))}
           onBlur={()=>setFirstName(firstName.trim())}
@@ -139,7 +221,7 @@ const RegistrationScreen = () => {
         />
         <TextInput
           style={styles.input}
-          placeholder="Last Name"
+          placeholder="Last Name*"
           value={lastName}
           onChangeText={(text) => setLastName(allowOnlyLetters(text))}
           onBlur={()=>setLastName(lastName.trim())}
@@ -147,14 +229,15 @@ const RegistrationScreen = () => {
         />
         <TextInput
           style={styles.input}
-          placeholder="Employee Code"
+          placeholder="Employee Code*"
           value={employeeCode}
           onChangeText={setEmployeeCode}
           placeholderTextColor="#888"
+          maxLength={15}
         />
         <TextInput
           style={styles.input}
-          placeholder="Mobile Number"
+          placeholder="Mobile Number*"
           maxLength={10}
           value={mobileNumber}
           onChangeText={(text) => setMobileNumber(allowOnlyNumbers(text))}
@@ -163,7 +246,7 @@ const RegistrationScreen = () => {
         />
         <TextInput
           style={styles.input}
-          placeholder="Email ID"
+          placeholder="Email ID*"
           value={email}
           onChangeText={(text) => setEmail(allowValidEmail(text))}
           keyboardType="email-address"
@@ -184,7 +267,7 @@ const RegistrationScreen = () => {
         <View style={styles.passwordContainer}>
           <TextInput
             style={[styles.input, { width: "100%" }]}
-            placeholder="Password"
+            placeholder="Password*"
             value={password}
             onChangeText={(text) => {
               setPassword(removeSpaces(text))
@@ -199,13 +282,38 @@ const RegistrationScreen = () => {
             style={styles.iconContainer}
           >
             <Icon
-              name={showPassword ? 'eye-off' : 'eye'}
+              name={showPassword ? 'eye' : 'eye-off'}
               size={24}
               color="#888"
             />
           </TouchableOpacity>
         </View>
         {passwordError?<Text style={styles.passwordError}>{passwordError}</Text>:""}
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={[styles.input, { width: "100%" }]}
+            placeholder="Confirm Password*"
+            value={confirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(removeSpaces(text))
+              setConfirmPasswordError("")
+            }}
+            onBlur={() => handleBlurConfirmPassword(password, confirmPassword)}
+            secureTextEntry={!showConfirmPassword}
+            placeholderTextColor="#888"
+          />
+          <TouchableOpacity
+            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            style={styles.iconContainer}
+          >
+            <Icon
+              name={showConfirmPassword ? 'eye' : 'eye-off'}
+              size={24}
+              color="#888"
+            />
+          </TouchableOpacity>
+        </View>
+        {confirmPasswordError?<Text style={styles.passwordError}>{confirmPasswordError}</Text>:""}
 
         <View style={styles.buttonContainer}>
           <Button

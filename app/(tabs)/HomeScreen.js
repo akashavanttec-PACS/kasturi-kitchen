@@ -21,6 +21,8 @@ import LoadingScreen from "../../components/LoadingScreen";
 import { Colors } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../services/firebase";
+import { Timestamp } from 'firebase/firestore';
+
 import { formatTimeTo12Hour, getCurrentISTTime, getISTDateString } from "../../utils/utils";
 
 // --- Development Flag ---
@@ -51,8 +53,9 @@ const isBookingTimeActive = () => {
 
   const startMinutes = 0; // 12:00 AM
   const endMinutes = 7 * 60 + 30; // 7:30 AM
-  console.log("startMinutes", startMinutes, "endMinutes", endMinutes);
-  // Booking active if time is between 12:00 AM and 7:30 AM
+//  const endMinutes = 16 * 60 + 30; // 16 hours = 4 PM, +30 mins
+ console.log("startMinutes", startMinutes, "endMinutes", endMinutes);
+ // Booking active if time is between 12:00 AM and 7:30 AM
   return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
 };
 
@@ -86,7 +89,7 @@ const HomeScreen = () => {
 
   const checkIfMealBookedAlready = async (userData) => {
     const today = new Date();
-    const todayDateString = today.toISOString().split("T")[0];
+    const todayDateString = getISTDateString();
 
     const bookingsRef = collection(db, "mealBookings");
     const q = query(
@@ -94,6 +97,7 @@ const HomeScreen = () => {
       where("employeeCode", "==", userData.employeeCode),
       where("mealDate", "==", todayDateString)
     );
+    console.log("Im checking the DB", userData.employeeCode, todayDateString)
     try {
       const querySnapshot = await getDocs(q);
       if (!querySnapshot.empty) {
@@ -101,8 +105,10 @@ const HomeScreen = () => {
         const { mealDate, mealTime } = docData;
 
         const formattedTime = formatTimeTo12Hour(mealTime); // e.g. "6:57 AM"
-
-        const message = `Your meal was booked on ${mealDate} at ${formattedTime}`;
+        const [year, month, day] = mealDate.split("-");
+        const formattedDate = `${day}-${month}-${year}`;
+        
+        const message = `Your meal was booked on ${formattedDate} at ${formattedTime}`;
         setBookedAlready(true);
         setBookingMessage(message);
       }
@@ -189,13 +195,15 @@ const HomeScreen = () => {
           employeeCode: userData.employeeCode,
           firstName: userData.firstName,
           lastName: userData.lastName,
+          email: userData.email,
           mealDate: todayDateString,
           mealTime: getCurrentISTTime(),
+          orderDate: new Date()
         };
         console.log(newBooking, "new booking")
-        console.log("bookingsRef",bookingsRef)
         await addDoc(bookingsRef, newBooking);
         Alert.alert("Success", "Your meal has been booked successfully.");
+        checkIfMealBookedAlready(userData)
       }
     } catch (error) {
       console.error("Error booking meal:", error);

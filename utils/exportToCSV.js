@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
 
-export async function exportBookingsAsCSV(sections) {
+export async function exportBookingsAsCSV(sections, mode='daily') {
   try {
     const rows = [];
     let totalCount = 0;
@@ -57,7 +57,7 @@ export async function exportBookingsAsCSV(sections) {
     // Write CSV file
     // -----------------------------------------
     const csvString = rows.join('\n');
-    const fileName = `bookings_${Date.now()}.csv`;
+    const fileName = `${mode}_bookings_${Date.now()}.csv`;
     const fileUri = FileSystem.cacheDirectory + fileName;
 
     await FileSystem.writeAsStringAsync(fileUri, csvString, {
