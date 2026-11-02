@@ -4,19 +4,17 @@
     "slug": "kasturi-kitchen",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/applogo.png",
+    "icon": "./assets/images/applogo-1024.png",
     "scheme": "kasturikitchen",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/applogo.png"
+        "foregroundImage": "./assets/images/applogo-adaptive.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.akashavanttec.kasturikitchen"
     },

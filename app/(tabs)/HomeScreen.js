@@ -1,14 +1,14 @@
 import { useRouter } from "expo-router";
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
   getDocs,
   query,
   where,
+  setDoc
 } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef  } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -71,7 +71,7 @@ const HomeScreen = () => {
   const [bookedAlready, setBookedAlready] = useState(false)
   const [bookingMessage, setBookingMessage] = useState("")
   const router = useRouter();
-
+  const isSubmittingRef = useRef(false);
   useEffect(() => {
     const interval = setInterval(() => {
       setIsBookingEnabled(isBookingTimeActive());
@@ -152,6 +152,9 @@ const HomeScreen = () => {
   };
 
   const handleBookMeal = async () => {
+      if (isSubmittingRef.current) return;      // instant lock, before anything else
+      isSubmittingRef.current = true;
+  try {
     if (!isBookingEnabled) {
       Alert.alert(
         "Booking Closed",
@@ -170,8 +173,13 @@ const HomeScreen = () => {
       );
       return;
     }
-
+    const rawCode = String(userData.employeeCode ?? "").trim();
+    if (!rawCode) {
+      Alert.alert("Error", "Employee code is missing. Please contact admin.");
+      return;
+    }
     const today = new Date();
+    setBookMealLoading(true);
     const todayDateString = getISTDateString();
 
     const bookingsRef = collection(db, "mealBookings");
@@ -181,8 +189,8 @@ const HomeScreen = () => {
       where("mealDate", "==", todayDateString)
     );
 
-    try {
-      setBookMealLoading(true);
+    
+      
       const querySnapshot = await getDocs(q);
       if (!querySnapshot.empty) {
         Alert.alert(
@@ -201,7 +209,11 @@ const HomeScreen = () => {
           orderDate: new Date()
         };
         console.log(newBooking, "new booking")
-        await addDoc(bookingsRef, newBooking);
+        // await addDoc(bookingsRef, newBooking);
+        console.log("Raw Code:", rawCode);
+        const bookingId = `${rawCode.replace(/\//g, "_")}_${todayDateString}`;
+        console.log("Booking ID:", bookingId);
+        await setDoc(doc(db, "mealBookings", bookingId), newBooking);
         Alert.alert("Success", "Your meal has been booked successfully.");
         checkIfMealBookedAlready(userData)
       }
@@ -210,6 +222,7 @@ const HomeScreen = () => {
       Alert.alert("Sorry!", "We’re unable to book your meal at the moment. Please try again later.");
     } finally {
       setBookMealLoading(false); // ✅ Always stop loading
+      isSubmittingRef.current = false; 
     }
   };
 

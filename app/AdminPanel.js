@@ -149,7 +149,7 @@ const currentMonth = currentDate.getMonth();
               style={styles.exportButton}
               onPress={() => exportBookingsAsCSV(bookings)}
             >
-              <Text style={styles.exportButtonText}>Daily Report</Text>
+              <Text style={styles.exportButtonText}>Get Daily Report</Text>
             </TouchableOpacity>
 
               {/* 🔹 Monthly Report Button */}
